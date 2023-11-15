@@ -50,3 +50,77 @@
 - 스프링은 DI(의존관계, 의존성 주입), DI 컨테이너 기술로 다형성 + OCP, DIP를 가능하게 지원한다.
 - 클라이언트 코드의 변경 없이 기능 확장이 가능하다.
 - 모든 설계에 **역할**과 **구현**을 분리하자. → 인터페이스 도입
+
+# 2. 스프링 핵심 원리 이해 1 - 예제 만들기
+
+### 비즈니스 요구사항과 설계
+
+- 회원
+    - 회원을 가입하고 조회할 수 있다.
+    - 회원은 일반과 VIP 두 가지 등급이 있다.
+    - 회원 데이터는 자체 DB를 구축할 수 있고, 외부 시스템과 연동할 수 있다.
+- 주문과 할인 정책
+    - 회원은 상품을 주문할 수 있다.
+    - 회원 등급에 따라 할인 정책을 적용할 수 있다.
+    - 할할인 정책은 모든 VIP는 1000원을 할인해주는 고정 금액 할인을 적용한다.
+    - 할인 정책은 변경 가능성이 높다. 회사의 기본 할인 정책을 아직 정하지 못했고, 오픈 직전까지 고민을 미루 고 싶다.  최악의 경우 할인을 적용하지 않을 수도 있다.
+
+→ 인터페이스를 만들고 구현체를 언제든지 갈아끼울 수 있도록 설계하자.
+
+### 회원 도메인
+
+- 회원 도메인 협력 관계
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/bdec87c6-e03d-46a0-8500-cc3a93c40b7f)
+
+    
+- 회원 클래스 다이어그램
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/c8eb38ea-8564-4b9b-87c1-476e2d0d7ba7)
+
+    
+- 회원 객체 다이어그램
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/4e3609b0-4204-4f10-b59f-065426fa51d9)
+
+    
+
+** 회원 도메인 설계의 문제점: 의존관계가 인터페이스 뿐만 아니라 구현까지 모두 의존하고 있다.
+
+### 주문과 할인 도메인
+
+- 주문 도메인 협력, 역할, 책임
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/be41e876-73b7-4e3f-9dc8-0f018330b1ab)
+
+    
+    1. **주문 생성**: 클라이언트는 주문 서비스에 주문 생성을 요청한다.
+    2. **회원 조회**: 할인을 위해서는 회원 등급이 필요하다. 그래서 주문 서비스는 회원 저장소에서 회원을 조회한다.
+    3. **할인 적용**: 주문 서비스는 회원 등급에 따른 할인 여부를 할인 정책에 위임한다.
+    4. **주문 결과 반환**: 주문 서비스는 할인 결과를 포함한 주문 결과를 반환한다.
+- 주문 도메인 전체
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/0530bc5f-45a6-4c83-98bd-a4041a460d16)
+
+    
+    - 역할과 구현을 분리해서 자유롭게 구현 객체를 조립할 수 있게 설계했다.
+    - 덕분에 회원 저장소와 할인 정책을 유연하게 변경할 수 있다.
+- 주문 도메인 클래스 다이어그램
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/cf1ea6bf-10d9-4946-9cdd-f997e3a71101)
+
+    
+- 주문 도메인 객체 다이어그램1
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/1db1ca7e-a4ae-4726-8a4a-8929eb7d0359)
+
+    
+    - 회원을 메모리에서 조회하고, 정액 할인 정책(고정 금액)을 지원해도 주문 서비스를 변경하지 않아도 된다.
+    - 역할들의 협력 관계를 그대로 재사용 할 수 있다.
+- 주문 도메인 객체 다이어그램2
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/c711cc96-0b65-4bb8-b83d-3b614d4c246d)
+
+    
+    - 회원을 메모리가 아닌 실제 DB에서 조회하고, 정률 할인 정책(주문 금액에 따라 % 할인)을 지원해도 주문 서비스를 변경하지 않아도 된다.
+    - 협력 관계를 그대로 재사용 할 수 있다.
