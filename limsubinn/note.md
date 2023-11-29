@@ -1150,3 +1150,126 @@ public class ApplicationContextInfoTest {
     - @Bean이 붙은 메서드마다 이미 스프링 빈이 존재하면 존재하는 빈을 반환하고, 스프링 빈이 없으면 생성해서 스프링 빈으로 등록하고 반환하는 코드가 동적으로 만들어진다.
     
     ** @Configuration을 적용하지 않고, @Bean만 적용하면 AppConfig가 CGLIB 기술 없이 순수한 AppConfig로 스프링 빈에 등록된다. 따라서 MemberRepository가 호출할 때마다 호출되고, 인스턴스가 같은지 테스트하는 코드도 실패하게 된다. (싱글톤이 깨짐!!!!!)
+
+  # 6. 컴포넌트 스캔
+
+### 컴포넌트 스캔과 의존관계 자동 주입 시작하기
+
+- 스프링 빈 등록
+    - 지금까지 스프링 빈을 등록할 때는 자바 코드의 @Bean이나 XML의 <bean> 등을 통해서 설정 정보에 직접 등록할 스프링 빈을 나열했다.
+    - 스프링은 설정 정보가 없어도 자동으로 스프링 빈을 등록하는 컴포넌트 스캔이라는 기능을 제공한다.
+    - 의존관계도 자동으로 주입하는 `@Autowired` 라는 기능도 제공한다.
+
+- 컴포넌트 스캔과 의존관계 자동 주입
+    - AutoAppConfig
+        
+        ```java
+        package hello.core;
+        
+        import org.springframework.context.annotation.ComponentScan;
+        import org.springframework.context.annotation.Configuration;
+        import org.springframework.context.annotation.FilterType;
+        
+        @Configuration
+        @ComponentScan(excludeFilters = @ComponentScan.Filter(type = FilterType.ANNOTATION, classes = Configuration.class))
+        public class AutoAppConfig {
+            
+        }
+        ```
+        
+        - 컴포넌트 스캔을 사용하려면 설정 정보에 `@ComponentScan`을 붙여준다.
+        - 기존의 AppConfig와 달리 @Bean으로 등록한 클래스가 하나도 없다.
+        
+        ** `excludeFilters`를 이용해서 설정정보는 컴포넌트 스캔 대상에서 제외했다. (기존 예제 코드를 유지하기 위함)
+        
+    - MemoryMemberRepository, RateDiscountPolicy, MemberServiceImpl, OrderServiceImpl → 컴포넌트 스캔의 대상이 되도록 `@Component`를 붙여준다.
+    - 의존관계 주입 → `@Autowired`를 붙여준다.
+        
+        ```java
+        package hello.core.member;
+        
+        import org.springframework.beans.factory.annotation.Autowired;
+        import org.springframework.stereotype.Component;
+        
+        @Component
+        public class MemberServiceImpl implements MemberService {
+        
+            private final MemberRepository memberRepository;
+        
+            @Autowired
+            public MemberServiceImpl(MemberRepository memberRepository) {
+                this.memberRepository = memberRepository;
+            }
+        
+        		...
+        
+        }
+        ```
+        
+
+- 동작 과정
+    1. @ComponentScan
+        
+        ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/52c94bf6-58c2-41e2-8b75-0384201f9945)
+
+        
+        - `@ComponentScan`은 `@Component`가 붙은 모든 클래스를 스프링 빈으로 등록한다.
+    2. @Autowired 의존관계 자동 주입
+        
+        ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/1727b826-3f69-4e33-9ee1-51529ad5a909)
+
+        
+        - 생성자에 `@Autowired` 를 지정하면, 스프링 컨테이너가 자동으로 해당 스프링 빈을 찾아서 주입한다.
+        - 기본 조회 전략은 타입이 같은 빈을 찾아서 주입한다.
+
+### 탐색 위치와 기본 스캔 대상
+
+- 탐색할 패키지의 시작 위치 지정
+    
+    ```java
+    @ComponentScan(
+            basePackages = "hello.core.member",
+            basePackageClasses = AutoAppConfig.class,
+            excludeFilters = @ComponentScan.Filter(type = FilterType.ANNOTATION, classes = Configuration.class)
+    )
+    ```
+    
+    - `basePackages`: 탐색할 패키지의 시작 위치 지정 (여러 개 가능)
+    - `basePackageClasses`: 지정한 클래스의 패키지를 탐색 시작 위치로 지정
+    - 지정하지 않으면 `@ComponentScan`이 붙은 설정 정보 클래스의 패키지가 시작 위치가 된다.
+    
+    ** 권장: 패키지 위치를 지정하지 않고, 설정 정보 클래스의 위치를 프로젝트 최상단에 두는 것이다.  최근 스프링 부트도 이 방법을 기본으로 제공한다.
+    
+    ** 스프링 부트의 대표 시작 정보인 `@SpringBootApplication` 안에 `@ComponentScan`이 들어있다.
+    
+
+- 컴포넌트 스캔 기본 대상 → 모두 스프링 빈으로 등록된다.
+    - `@Component` : 컴포넌트 스캔에서 사용
+    - `@Controller` : 스프링 MVC 컨트롤러에서 사용 + 스프링 MVC 컨트롤러로 인식
+    - `@Service` : 스프링 비즈니스 로직에서 사용
+    - `@Repository` : 스프링 데이터 접근 계층에서 사용 + 스프링 데이터 접근 계층으로 인식하고, 데이터 계층의 예외를 스프링 예외로 변환
+    - `@Configuration` : 스프링 설정 정보에서 사용 + 스프링 설정 정보로 인식하고, 스프링 빈이 싱글톤을 유지하도록 추가 처리
+
+** `useDefaultFilters` 옵션은 기본으로 켜져있는데, 이 옵션을 끄면 기본 스캔 대상들이 제외된다.
+
+### 필터
+
+- 필터
+    - `includeFilters` : 컴포넌트 스캔 대상을 추가로 지정한다.
+    - `excludeFilters` : 컴포넌트 스캔에서 제외할 대상을 지정한다.
+
+- FilterType 옵션
+    - ANNOTATION: 기본값, 애노테이션을 인식해서 동작한다.
+    - ASSIGNABLE_TYPE: 지정한 타입과 자식 타입을 인식해서 동작한다.
+    - ASPECTJ: AspectJ 패턴 사용
+    - REGEX: 정규 표현식
+    - CUSTOM: `TypeFilter`라는 인터페이스를 구현해서 처리
+
+### 중복 등록과 충돌
+
+- 자동 빈 등록 vs 자동 빈 등록
+    - 컴포넌트 스캔에 의해 자동으로 스프링 빈이 등록되는데, 그 이름이 같은 경우 스프링은 오류를 발생시킨다.
+    - `ConflictingBeanDefinitionException`
+
+- 수동 빈 등록 vs 자동 빈 등록
+    - 수동 빈 등록이 우선권을 가진다.
