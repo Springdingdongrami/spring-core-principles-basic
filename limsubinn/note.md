@@ -192,7 +192,7 @@
         - MemoryMemberRepository
         - OrderServiceImpl
         - FixDiscountPolicy
-    - AppConfig는 생성한 객체 인스턴스의 참조를 **생성자를 통해서 주입(연결)**해준다.
+    - AppConfig는 생성한 객체 인스턴스의 참조를 **생성자를 통해서 주입(연결)** 해준다.
         - MemberServiceImpl → MemoryMemberRepository
             
             ```java
@@ -332,7 +332,7 @@ public class AppConfig {
 ** 프레임워크(프레임워크가 코드를 제어하고 실행) vs 라이브러리(내 코드가 직접 제어의 흐름을 담당)
 
 - 의존관계 주입 DI (Dependency Injection)
-    - 애플리케이션 **실행 시점(런타임)**에 외부에서 실제 구현 객체를 생성하고 클라이언트에 전달해서 클라이언트와 서버의 실제 의존관계가 연결 되는 것
+    - 애플리케이션 **실행 시점(런타임)** 에 외부에서 실제 구현 객체를 생성하고 클라이언트에 전달해서 클라이언트와 서버의 실제 의존관계가 연결 되는 것
     - 객체 인스턴스를 생성하고, 그 참조값을 전달해서 연결된다.
     - 의존관계 주입을 사용하면 클라이언트 코드를 변경하지 않고, 클라이언트가 호출하는 대상의 타입 인스턴스를 변경할 수 있다. ⭐️⭐️⭐️
     - 의존관계 주입을 사용하면 정적인 클래스 의존관계를 변경하지 않고, 동적인 객체 인스턴스 의존관계를 쉽게 변경할 수 있다. ⭐️⭐️⭐️
@@ -953,7 +953,7 @@ public class ApplicationContextInfoTest {
 
 ### 싱글톤 방식의 주의점
 
-- 싱글톤 방식은 여러 클라이언트가 하나의 같은 객체 인스턴스를 공유하기 때문에 싱글톤 객체는 상태를 유지(stateful)하게 설계하면 안된다. **무상태(stateless)**로 설계해야 한다! ⭐️⭐️⭐️
+- 싱글톤 방식은 여러 클라이언트가 하나의 같은 객체 인스턴스를 공유하기 때문에 싱글톤 객체는 상태를 유지(stateful)하게 설계하면 안된다. **무상태(stateless)** 로 설계해야 한다! ⭐️⭐️⭐️
     - 특정 클라이언트에 의존적인 필드가 있으면 안 된다.
     - 특정 클라이언트가 값을 변경할 수 있는 필드가 있으면 안 된다.
     - 가급적 읽기만 가능해야 한다.
@@ -1273,3 +1273,507 @@ public class ApplicationContextInfoTest {
 
 - 수동 빈 등록 vs 자동 빈 등록
     - 수동 빈 등록이 우선권을 가진다.
+ 
+# 7. 의존관계 자동 주입
+
+### 다양한 의존관계 주입 방법
+
+- 생성자 주입
+    
+    ```java
+    @Component
+    public class OrderServiceImpl implements OrderService {
+    
+        private final MemberRepository memberRepository;
+        private final DiscountPolicy discountPolicy;
+    
+        @Autowired
+        public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+            this.memberRepository = memberRepository;
+            this.discountPolicy = discountPolicy;
+        }
+    
+    		...
+    }
+    ```
+    
+    - 생성자를 통해서 의존 관계를 주입 받는 방법
+    - 생성자 호출시점에 딱 1번만 호출되는 것이 보장된다.
+    - **불변**, **필수** 의존관계에 사용
+    - **생성자가 딱 1개만 있으면 @Autowired를 생략해도 자동 주입 된다.** ⭐️⭐️⭐️ (스프링 빈에만 해당)
+
+- 수정자 주입 (setter 주입)
+    
+    ```java
+    @Component
+    public class OrderServiceImpl implements OrderService {
+    
+        private MemberRepository memberRepository;
+        private DiscountPolicy discountPolicy;
+    
+        @Autowired
+        public void setMemberRepository(MemberRepository memberRepository) {
+            this.memberRepository = memberRepository;
+        }
+    
+        @Autowired
+        public void setDiscountPolicy(DiscountPolicy discountPolicy) {
+            this.discountPolicy = discountPolicy;
+        }
+    
+    		...
+    }
+    ```
+    
+    - setter라 불리는 필드의 값을 변경하는 수정자 메서드를 통해서 의존관계를 주입하는 방법
+    - **선택**, **변경** 가능성이 있는 의존관계에 사용
+    - 자바빈 프로퍼티 규약의 수정자 메서드 방식을 사용하는 방법
+    
+    ** `@Autowired` 의 기본 동작은 주입할 대상이 없으면 오류가 발생한다. 주입할 대상이 없어도 동작하게 하려면 `@Autowired(required = false)` 로 지정하면 된다.
+    
+    ** 자바에서는 과거부터 필드의 값을 직접 변경하지 않고, setXxx, getXxx 라는 메서드를 통해서 값을 읽거나 수정하는 규칙을 만들었는데, 그것이 자바빈 프로퍼티 규약이다.
+    
+
+- 필드 주입
+    
+    ```java
+    @Component
+    public class OrderServiceImpl implements OrderService {
+    
+        @Autowired
+        private MemberRepository memberRepository;
+        @Autowired
+        private DiscountPolicy discountPolicy;
+    
+    		...
+    }
+    ```
+    
+    - 필드에 바로 주입하는 방법
+    - 외부에서 변경이 불가능해서 테스트 하기 힘들다는 치명적인 단점
+    - DI 프레임워크가 없으면 아무것도 할 수 없다.
+    - 사용하지 말자!
+
+- 일반 메서드 주입
+    
+    ```java
+    @Component
+    public class OrderServiceImpl implements OrderService {
+    
+        private MemberRepository memberRepository;
+        private DiscountPolicy discountPolicy;
+    
+        @Autowired
+        public void init(MemberRepository memberRepository, DiscountPolicy
+                discountPolicy) {
+            this.memberRepository = memberRepository;
+            this.discountPolicy = discountPolicy;
+        }
+    
+    		...
+    }
+    ```
+    
+    - 일반 메서드를 통해서 주입 받을 수 있다.
+    - 한 번에 여러 필드를 주입 받을 수 있다.
+    - 일반적으로 잘 사용하지 않는다.
+
+### 옵션 처리
+
+- 자동 주입 대상을 옵션으로 처리하는 방법
+    - `@Autowired(required=false)` : 자동 주입할 대상이 없으면 수정자 메서드 자체가 호출되지 않는다.
+    - `org.springframework.lang.@Nullable` : 자동 주입할 대상이 없으면 null이 입력된다.
+    - `Optional<>` : 자동 주입할 대상이 없으면 `Optional.empty` 가 입력된다.
+
+- 테스트 코드
+    
+    ```java
+    package hello.core.autowired;
+    
+    import hello.core.member.Member;
+    import jakarta.annotation.Nullable;
+    import org.junit.jupiter.api.Test;
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.context.ApplicationContext;
+    import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+    
+    import java.util.Optional;
+    
+    public class AutowiredTest {
+    
+        @Test
+        void AutowiredOption() {
+            new AnnotationConfigApplicationContext(TestBean.class);
+        }
+    
+        static class TestBean {
+    
+            @Autowired(required = false)
+            public void setNoBean1(Member noBean1) {
+                System.out.println("noBean1 = " + noBean1);
+            }
+    
+            @Autowired
+            public void setNoBean2(@Nullable Member noBean2) {
+                System.out.println("noBean2 = " + noBean2);
+            }
+    
+            @Autowired
+            public void setNoBean3(Optional<Member> noBean3) {
+                System.out.println("noBean3 = " + noBean3);
+            }
+    
+        }
+    }
+    ```
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/586fe2c1-015b-4f5d-829f-b361ab2baac0)
+
+    
+    - noBean1 : 호출 안 됨
+    - noBean2 : null 호출
+    - noBean3 : Optional.empty 호출
+    
+    ** Member는 스프링 빈이 아니기 때문에 @Autowired(required=true)이면 예외 터짐.
+    
+
+### 생성자 주입을 선택해라!
+
+- 불변
+    - 대부분의 의존관계 주입은 한번 일어나면 애플리케이션 종료시점까지 의존관계를 변경할 일이 없다. 오히려 대부분의 의존관계는 애플리케이션 종료 전까지 변하면 안된다.(불변해야 한다.)
+    - 수정자 주입을 사용하면, setXxx 메서드를 public으로 열어두어야 한다. 누군가 실수로 변경할 수도 있고, 변경하면 안되는 메서드를 열어두는 것은 좋은 설계 방법이 아니다.
+    - 생성자 주입은 객체를 생성할 때 딱 1번만 호출되므로 이후에 호출되는 일이 없다. 따라서 불변하게 설계할 수 있다.
+
+- 누락
+    - 생성자 주입을 사용하면 주입 데이터를 누락했을 때 **컴파일 오류**가 발생한다.
+    - 그리고 IDE에서 바로 어떤 값을 필수로 주입해야 하는지 알 수 있다.
+
+- final 키워드
+    - 생성자 주입을 사용하면 필드에 final 키워드를 사용할 수 있다.
+    - 그래서 생성자에서 혹시라도 값이 설정되지 않는 오류를 컴파일 시점에 막아준다.
+
+** 생성자 주입 방식은 순수한 자바 언어의 특징을 잘 살리는 방법이기도 하다.
+
+** 기본으로 생성자 주입을 사용하고, 필수 값이 아닌 경우에는 수정자 주입 방식을 옵션으로 부여하면 된다. 생성자 주입과 수정자 주입을 동시에 사용할 수 있다. (필드 주입은 사용하지 않는게 좋다.)
+
+### 롬복과 최신 트랜드
+
+- 롬복 설정
+    - build.gradle
+        
+        ```java
+        // lombok 설정
+        configurations {
+        	compileOnly {
+        		extendsFrom annotationProcessor
+        	}
+        }
+        ```
+        
+        ```java
+        dependencies {
+        	// lombok 라이브러리
+        	compileOnly 'org.projectlombok:lombok'
+        	annotationProcessor 'org.projectlombok:lombok'
+        	testCompileOnly 'org.projectlombok:lombok'
+        	testAnnotationProcessor 'org.projectlombok:lombok'
+        }
+        ```
+        
+    - settings (롬복 플러그인 설치 및 enable annotation processing)
+        
+        ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/bedee626-5067-44e8-851e-7cd1d05aad2a)
+
+        
+        ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/6989678c-80cb-41ea-a83a-d615d6416327)
+
+        
+
+- 예시
+    
+    ```java
+    package hello.core;
+    
+    import lombok.Getter;
+    import lombok.Setter;
+    import lombok.ToString;
+    
+    @Getter
+    @Setter
+    @ToString
+    public class HelloLombok {
+    
+        private String name;
+        private int age;
+    
+        public static void main(String[] args) {
+            HelloLombok helloLombok = new HelloLombok();
+            helloLombok.setName("hihihi");
+    
+            String name = helloLombok.getName();
+            System.out.println("name = " + name);
+    
+            System.out.println("helloLombok = " + helloLombok);
+        }
+    }
+    ```
+    
+
+- OrderServiceImpl
+    1. 생성자 주입
+        
+        ```java
+        @Component
+        public class OrderServiceImpl implements OrderService {
+        
+            private final MemberRepository memberRepository;
+            private final DiscountPolicy discountPolicy;
+        
+            @Autowired
+            public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+                this.memberRepository = memberRepository;
+                this.discountPolicy = discountPolicy;
+            }
+        
+        		...
+        }
+        ```
+        
+    2. 생성자가 1개 있으면 @Autowired 생략 가능
+        
+        ```java
+        @Component
+        public class OrderServiceImpl implements OrderService {
+        
+            private final MemberRepository memberRepository;
+            private final DiscountPolicy discountPolicy;
+        
+            public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+                this.memberRepository = memberRepository;
+                this.discountPolicy = discountPolicy;
+            }
+        
+        		...
+        }
+        ```
+        
+    3. 롬복 적용
+        - `@RequiredArgsConstructor` : final이 붙은 필드를 모아서 생성자를 자동으로 만들어준다.
+        
+        ```java
+        @Component
+        @RequiredArgsConstructor
+        public class OrderServiceImpl implements OrderService {
+        
+            private final MemberRepository memberRepository;
+            private final DiscountPolicy discountPolicy;
+        
+        		...
+        }
+        ```
+        
+
+### 조회 빈이 2개 이상 - 문제
+
+`@Autowired`는 타입으로 조회한다. 타입으로 조회하면 선택된 빈이 2개 이상일 때 문제가 발생한다.
+
+이때 하위 타입으로 지정할 수도 있지만, 하위 타입으로 지정하는 것은 DIP를 위배하고 유연성이 떨어진다. 그리고 이름만 다르고, 완전히 똑같은 타입의 스프링 빈이 2개 있을 때 해결이 안 된다.
+
+스프링 빈을 수동 등록해서 문제를 해결해도 되지만, 의존 관계 자동 주입에서 해결하는 여러 방법이 있다.
+
+### @Autowired 필드 명, @Qualifier, @Primary
+
+- @Autowired 필드 명 매칭
+    
+    ```java
+    // 기존 코드
+    @Autowired
+    private DiscountPolicy discountPolicy
+    
+    // 변경 코드
+    @Autowired
+    private DiscountPolicy rateDiscountPolicy
+    ```
+    
+    - `@Autowired` 는 타입 매칭을 시도하고 이때 여러 빈이 있으면 필드 이름, 파라미터 이름으로 빈 이름을 추가 매칭한다.
+    - 필드 명을 빈 이름으로 변경한다.
+
+** @Autowired 매칭 정리
+
+1. 타입 매칭
+2. 타입 매칭의 결과가 2개 이상일 때 필드 명, 파라미터 명으로 빈 이름 매칭
+
+- @Qualifier 사용
+    
+    ```java
+    @Component
+    @Qualifier("mainDiscountPolicy")
+    public class RateDiscountPolicy implements DiscountPolicy {}
+    
+    @Component
+    @Qualifier("fixDiscountPolicy")
+    public class FixDiscountPolicy implements DiscountPolicy {}
+    
+    /***********************************************************************/
+    
+    @Autowired
+     public OrderServiceImpl(MemberRepository memberRepository,
+                             @Qualifier("mainDiscountPolicy") DiscountPolicy discountPolicy) {
+         this.memberRepository = memberRepository;
+         this.discountPolicy = discountPolicy;
+    }
+    ```
+    
+    - `@Qualifier` 는 추가 구분자를 붙여주는 방법이다. (주입시 추가적인 방법을 제공하는 것이지 빈 이름을 변경하는 것은 아니다.)
+    - 빈 등록 시 @Qualifier를 붙여주고, 주입 시에 @Qualifier를 붙여주고 등록한 이름을 적어준다.
+
+** @Qualifier 정리
+
+1. @Qualifier끼리 매칭
+
+2. 빈 이름 매칭
+
+3. `NoSuchBeanDefinitionException` 예외 발생
+
+- @Primary 사용
+    
+    ```java
+    @Component
+    @Primary
+    public class RateDiscountPolicy implements DiscountPolicy {}
+    
+    @Component
+    public class FixDiscountPolicy implements DiscountPolicy {}
+    
+    /***********************************************************************/
+    
+    // 생성자
+    @Autowired
+    public OrderServiceImpl(MemberRepository memberRepository,
+                             DiscountPolicy discountPolicy) {
+         this.memberRepository = memberRepository;
+         this.discountPolicy = discountPolicy;
+    }
+    
+    // 수정자
+    @Autowired
+    public DiscountPolicy setDiscountPolicy(DiscountPolicy discountPolicy) {
+         this.discountPolicy = discountPolicy;
+    }
+    
+    // => RateDiscountPolicy가 주입 됨.
+    ```
+    
+    - `@Primary` 는 우선순위를 정하는 방법이다. @Autowired 시에 여러 빈이 매칭되면 `@Primary` 가 우선권을 가진다.
+
+** 메인 데이터베이스의 커넥션을 획득하는 스프링 빈은 `@Primary` 를 적용해서 조회하는 곳에서 `@Qualifier` 지정 없이 편리하게 조회하고, 서브 데이터베이스 커넥션 빈을 획득할 때는 `@Qualifier` 를 지정해서 명시적으로 획득 하는 방식으로 사용하면 코드를 깔끔하게 유지할 수 있다. 물론 이때 메인 데이터베이스의 스프링 빈을 등록할 때 `@Qualifier` 를 지정해주는 것은 상관없다.
+
+** 우선순위: `@Qualifier` > `@Primary`
+
+### 애노테이션 직접 만들기
+
+- `@Qualifier("mainDiscountPolicy")` 이렇게 문자를 적으면 컴파일시 타입 체크가 안된다. 다음과 같은 애노테이션을 만들어서 문제를 해결할 수 있다.
+    
+    ```java
+    package hello.core.annotation;
+    
+    import org.springframework.beans.factory.annotation.Qualifier;
+    
+    import java.lang.annotation.*;
+    
+    @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER,
+            ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+    @Retention(RetentionPolicy.RUNTIME)
+    @Documented
+    @Qualifier("mainDiscountPolicy")
+    public @interface MainDiscountPolicy {
+    
+    }
+    ```
+    
+    ```java
+    @Component
+    public class OrderServiceImpl implements OrderService {
+    
+        private final MemberRepository memberRepository;
+        private final DiscountPolicy discountPolicy;
+    
+        public OrderServiceImpl(MemberRepository memberRepository, @MainDiscountPolicy DiscountPolicy discountPolicy) {
+            this.memberRepository = memberRepository;
+            this.discountPolicy = discountPolicy;
+        }
+    
+    		...
+    }
+    ```
+    
+
+### 조회한 빈이 모두 필요할 때, List, Map
+
+- 의도적으로 정말 해당 타입의 스프링 빈이 다 필요한 경우도 있다. 예를 들어서 할인 서비스를 제공하는데, 클라이언트가 할인의 종류(rate, fix)를 선택할 수 있다고 가정해보자. 스프링을 사용하면 소위 말하는 전략 패턴을 매우 간단하게 구현할 수 있다.
+    
+    ```java
+    package hello.core.autowired;
+    
+    import hello.core.AutoAppConfig;
+    import hello.core.discount.DiscountPolicy;
+    import hello.core.member.Grade;
+    import hello.core.member.Member;
+    import org.junit.jupiter.api.Test;
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.context.ApplicationContext;
+    import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+    
+    import java.util.List;
+    import java.util.Map;
+    
+    import static org.assertj.core.api.Assertions.assertThat;
+    
+    public class AllBeanTest {
+    
+        @Test
+        void findAllBean() {
+            ApplicationContext ac = new AnnotationConfigApplicationContext(AutoAppConfig.class, DiscountService.class);
+    
+            DiscountService discountService = ac.getBean(DiscountService.class);
+            Member member = new Member(1L, "userA", Grade.VIP);
+            int fixDiscountPrice = discountService.discount(member, 10000, "fixDiscountPolicy");
+    
+            assertThat(discountService).isInstanceOf(DiscountService.class);
+            assertThat(fixDiscountPrice).isEqualTo(1000);
+    
+            int rateDiscountPrice = discountService.discount(member, 20000, "rateDiscountPolicy");
+            assertThat(rateDiscountPrice).isEqualTo(2000);
+    
+        }
+    
+        static class DiscountService {
+            private final Map<String, DiscountPolicy> policyMap;
+            private final List<DiscountPolicy> policies;
+    
+            @Autowired
+            public DiscountService(Map<String, DiscountPolicy> policyMap, List<DiscountPolicy> policies) {
+                this.policyMap = policyMap;
+                this.policies = policies;
+                System.out.println("policyMap = " + policyMap);
+                System.out.println("policies = " + policies);
+            }
+    
+            public int discount(Member member, int price, String discountCode) {
+                DiscountPolicy discountPolicy = policyMap.get(discountCode);
+                return discountPolicy.discount(member, price);
+            }
+        }
+    }
+    ```
+    
+
+### 자동, 수동의 올바른 실무 운영 기준
+
+- 스프링이 나오고 시간이 갈 수록 점점 자동을 선호하는 추세다. 자동 빈 등록을 사용해도 OCP, DIP를 지킬 수 있다.
+- 그러면 수동 빈 등록은 언제 사용하면 좋을까?
+    - 애플리케이션은 크게 업무 로직과 기술 지원 로직으로 나눌 수 있다.
+        - **업무 로직 빈** : 웹을 지원하는 컨트롤러, 핵심 비즈니스 로직이 있는 서비스, 데이터 계층의 로직을 처리하는 리포지토리 등이 모두 업무 로직이다. 보통 비즈니스 요구사항을 개발할 때 추가되거나 변경된다.
+        - **기술 지원 빈** : 기술적인 문제나 공통 관심사(AOP)를 처리할 때 주로 사용된다. 데이터베이스 연결이나, 공통 로그 처리 처럼 업무 로직을 지원하기 위한 하부 기술이나 공통 기술들이다.
+    - 업무 로직은 가급적 자동 기능을 적극 사용하고, 기술 지원 로직은 수동 로직을 사용하는 것이 좋다.
+    - 다형성을 적극 활용하는 비즈니스 로직은 수동 등록을 고민해보자.
