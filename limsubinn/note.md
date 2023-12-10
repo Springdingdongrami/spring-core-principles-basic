@@ -1777,3 +1777,314 @@ public class ApplicationContextInfoTest {
         - **기술 지원 빈** : 기술적인 문제나 공통 관심사(AOP)를 처리할 때 주로 사용된다. 데이터베이스 연결이나, 공통 로그 처리 처럼 업무 로직을 지원하기 위한 하부 기술이나 공통 기술들이다.
     - 업무 로직은 가급적 자동 기능을 적극 사용하고, 기술 지원 로직은 수동 로직을 사용하는 것이 좋다.
     - 다형성을 적극 활용하는 비즈니스 로직은 수동 등록을 고민해보자.
+
+# 8. 빈 생명주기 콜백
+
+### 빈 생명주기 콜백 시작
+
+- 데이터베이스 커넥션 풀이나 네트워크 소켓처럼 애플리케이션 시작 시점에 필요한 연결을 미리 해두고 애플리케이션 종료 시점에 연결을 모두 종료하는 작업을 진행하려면, 객체의 초기화와 종료 작업이 필요하다.
+
+- 예제) 외부 네트워크에 미리 연결하는 객체를 하나 생성
+    - 애플리케이션 시작 시점에 `connect()` 를 호출해서 연결을 맺어두어야 하고, 애플리케이션이 종료되면 `disConnect()` 를 호출해서 연결을 끊어야 한다.
+        
+        ```java
+        package hello.core.lifecycle;
+        
+        public class NetworkClient {
+        
+            private String url;
+        
+            public NetworkClient() {
+                System.out.println("생성자 호출, url = " + url);
+                connect();
+                call("초기화 연결 메시지");
+            }
+        
+            public void setUrl(String url) {
+                this.url = url;
+            }
+        
+            // 서비스 시작 시 호출
+            public void connect() {
+                System.out.println("connect: " + url);
+            }
+        
+            public void call(String message) {
+                System.out.println("call: " + url + " / message = " + message);
+            }
+        
+            // 서비스 종료 시 호출
+            public void disconnect() {
+                System.out.println("close: " + url);
+            }
+        
+        }
+        ```
+        
+        ```java
+        package hello.core.lifecycle;
+        
+        import org.junit.jupiter.api.Test;
+        import org.springframework.context.ConfigurableApplicationContext;
+        import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+        import org.springframework.context.annotation.Bean;
+        import org.springframework.context.annotation.Configuration;
+        
+        public class BeanLifeCycleTest {
+        
+            @Test
+            public void lifeCycleTest() {
+                ConfigurableApplicationContext ac = new AnnotationConfigApplicationContext(LifeCycleConfig.class);
+                NetworkClient client = ac.getBean(NetworkClient.class);
+                ac.close();
+            }
+        
+            @Configuration
+            static class LifeCycleConfig {
+                @Bean
+                public NetworkClient networkClient() {
+                    NetworkClient networkClient = new NetworkClient();
+                    networkClient.setUrl("http://hello-spring.dev");
+                    return networkClient;
+                }
+            }
+        
+        }
+        ```
+        
+        ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/2f341130-fe21-41d9-80da-b505137c6443)
+
+        
+    - 객체를 생성하는 단계에는 url이 없고, 객체를 생성한 다음에 외부에서 수정자 주입을 통해서 `setUrl()` 이 호출되어야 url이 존재하게 된다.
+
+- 스프링 빈의 라이프 사이클
+    - **객체 생성 → 의존관계 주입**
+    - 스프링 빈은 객체를 생성하고, 의존관계 주입이 다 끝난 다음에야 데이터를 사용할 수 있는 준비가 완료된다.
+    - 따라서 초기화 작업은 의존관계 주입이 모두 완료되고 난 다음에 호출해야 한다.
+
+- 스프링은 의존관계 주입이 완료되면 스프링 빈에게 콜백 메서드를 통해 초기화 시점을 알려주는 기능을 제공한다. 또한, 스프링 컨테이너가 종료되기 직전에 소멸 콜백을 준다. 따라서 안전하게 종료 작업을 진행할 수 있다.
+    - 스프링 빈의 이벤트 라이프 사이클
+        - **스프링 컨테이너 생성 → 스프링 빈 생성 → 의존관계 주입 → 초기화 콜백 → 사용 → 소멸 전 콜백 → 스프링 종료**
+        - 초기화 콜백: 빈이 생성되고, 빈의 의존관계 주입이 완료된 후 호출
+        - 소멸 전 콜백: 빈이 소멸되기 직전에 호출
+
+- 스프링의 빈 생명주기 콜백 지원 방법
+    - 인터페이스 (InitializingBean, DisposableBean)
+    - 설정 정보에 초기화 메서드, 종료 메서드 지정 **(외부 라이브러리에도 적용해야 할 때 사용)**
+    - @PostConstruct, @PreDestroy 애노테이션 지원 **(권장)**
+
+** 객체의 생성과 초기화를 분리하자.
+
+### 인터페이스 InitializingBean, DisposableBean
+
+- 초기화, 소멸 인터페이스
+    
+    ```java
+    package hello.core.lifecycle;
+    
+    import org.springframework.beans.factory.DisposableBean;
+    import org.springframework.beans.factory.InitializingBean;
+    
+    public class NetworkClient1 implements InitializingBean, DisposableBean {
+    
+        private String url;
+    
+        public NetworkClient1() {
+            System.out.println("생성자 호출, url = " + url);
+        }
+    
+        public void setUrl(String url) {
+            this.url = url;
+        }
+    
+        // 서비스 시작 시 호출
+        public void connect() {
+            System.out.println("connect: " + url);
+        }
+    
+        public void call(String message) {
+            System.out.println("call: " + url + " / message = " + message);
+        }
+    
+        // 서비스 종료 시 호출
+        public void disconnect() {
+            System.out.println("close: " + url);
+        }
+    
+        @Override
+        public void afterPropertiesSet() throws Exception { // 초기화
+            System.out.println("NetworkClient.afterPropertiesSet");
+            connect();
+            call("초기화 연결 메시지");
+        }
+    
+        @Override
+        public void destroy() throws Exception { // 소멸
+            System.out.println("NetworkClient.destroy");
+            disconnect();
+        }
+    
+    }
+    ```
+    
+    ![image](https://github.com/Springdingdongrami/spring-core-principles-basic/assets/66028419/8063c1e7-54d3-4552-a428-48661833061c)
+
+    
+
+- 단점
+    - 이 인터페이스는 스프링 전용 인터페이스다. 해당 코드가 스프링 전용 인터페이스에 의존한다.
+    - 초기화, 소멸 메서드의 이름을 변경할 수 없다.
+    - 내가 코드를 고칠 수 없는 외부 라이브러리에 적용할 수 없다.
+
+** 스프링 초창기에 나온 방법이고, 거의 사용하지 않는다.
+
+### 빈 등록 초기화, 소멸 메서드 지정
+
+- 설정 정보에 초기화 및 소멸 메서드 지정
+    - `@Bean(initMethod = "init", destroyMethod = "close")`
+    
+    ```java
+    package hello.core.lifecycle;
+    
+    public class NetworkClient2 {
+    
+        private String url;
+    
+        public NetworkClient2() {
+            System.out.println("생성자 호출, url = " + url);
+        }
+    
+        public void setUrl(String url) {
+            this.url = url;
+        }
+    
+        // 서비스 시작 시 호출
+        public void connect() {
+            System.out.println("connect: " + url);
+        }
+    
+        public void call(String message) {
+            System.out.println("call: " + url + " / message = " + message);
+        }
+    
+        // 서비스 종료 시 호출
+        public void disconnect() {
+            System.out.println("close: " + url);
+        }
+    
+        public void init() { // 초기화
+            System.out.println("NetworkClient.afterPropertiesSet");
+            connect();
+            call("초기화 연결 메시지");
+        }
+    
+        public void close() { // 소멸
+            System.out.println("NetworkClient.close");
+            disconnect();
+        }
+    
+    }
+    ```
+    
+    ```java
+    package hello.core.lifecycle;
+    
+    import org.junit.jupiter.api.Test;
+    import org.springframework.context.ConfigurableApplicationContext;
+    import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+    
+    public class BeanLifeCycleTest2 {
+    
+        @Test
+        public void lifeCycleTest() {
+            ConfigurableApplicationContext ac = new AnnotationConfigApplicationContext(LifeCycleConfig.class);
+            NetworkClient2 client = ac.getBean(NetworkClient2.class);
+            ac.close();
+        }
+    
+        @Configuration
+        static class LifeCycleConfig {
+            @Bean(initMethod = "init", destroyMethod = "close")
+            public NetworkClient2 networkClient() {
+                NetworkClient2 networkClient = new NetworkClient2();
+                networkClient.setUrl("http://hello-spring.dev");
+                return networkClient;
+            }
+        }
+    
+    }
+    ```
+    
+
+- 장점
+    - 메서드 이름을 자유롭게 줄 수 있다.
+    - 스프링 빈이 스프링 코드에 의존하지 않는다.
+    - 코드를 고칠 수 없는 외부 라이브러리에도 초기화, 종료 메서드를 적용할 수 있다.
+
+- 종료 메서드 추론
+    - @Bean의 destroyMethod 는 기본값이 `(inferred)`으로 등록되어 있다.
+    - 이 추론 기능은 `close`, `shutdown`라는 이름의 메서드를 자동으로 호출해준다.
+    - 따라서 직접 스프링 빈으로 등록하면 종료 메서드는 따로 적어주지 않아도 잘 동작한다.
+    - 추론 기능을 사용하기 싫으면 `destroyMethod=""` 처럼 빈 공백을 지정하면 된다.
+
+### 애노테이션 @PostConstruct, @PreDestroy
+
+- `@PostConstruct`, `@PreDestroy` 애노테이션 사용
+    
+    ```java
+    package hello.core.lifecycle;
+    
+    import jakarta.annotation.PostConstruct;
+    import jakarta.annotation.PreDestroy;
+    
+    public class NetworkClient3 {
+    
+        private String url;
+    
+        public NetworkClient3() {
+            System.out.println("생성자 호출, url = " + url);
+        }
+    
+        public void setUrl(String url) {
+            this.url = url;
+        }
+    
+        // 서비스 시작 시 호출
+        public void connect() {
+            System.out.println("connect: " + url);
+        }
+    
+        public void call(String message) {
+            System.out.println("call: " + url + " / message = " + message);
+        }
+    
+        // 서비스 종료 시 호출
+        public void disconnect() {
+            System.out.println("close: " + url);
+        }
+    
+        @PostConstruct
+        public void init() { // 초기화
+            System.out.println("NetworkClient.afterPropertiesSet");
+            connect();
+            call("초기화 연결 메시지");
+        }
+    
+        @PreDestroy
+        public void close() { // 소멸
+            System.out.println("NetworkClient.close");
+            disconnect();
+        }
+    
+    }
+    ```
+    
+
+- 특징
+    - 최신 스프링에서 가장 권장하는 방법
+    - 애노테이션 하나만 붙이면 되므로 매우 편리
+    - 스프링이 아닌 다른 컨테이너에서도 동작 (스프링에 종속적인 기술이 아니라 자바 표준)
+    - 컴포넌트 스캔과 잘 어울린다.
+    - 유일한 단점은 외부 라이브러리에는 적용하지 못한다는 것이다.
